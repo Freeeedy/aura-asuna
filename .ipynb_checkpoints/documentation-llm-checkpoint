@@ -1,0 +1,31 @@
+## Session 1 (~1.5 hours) 18.6.2025
+
+### What I Did
+- Initialized Python virtual environment (`venv`)
+- Installed required libraries (e.g., `torch`)
+- Started building the bigram model
+- Encoded input text using UTF-8
+- Sorted all used characters
+
+### What I Learned
+- Tensors: multidimensional arrays used in PyTorch for efficient linear algebra
+- How PyTorch handles data using the GPU (or CPU fallback)
+
+---
+
+## Session 2 (~3.5 hours) 19.6.2025
+
+### What I Did
+- Enabled CUDA/CPU backend selection for PyTorch
+- Annotated every line of code for better understanding
+- Created `torch_example.ipynb` to test functions
+
+### What I Learned
+- Explored PyTorch tensor functions:
+  - `tensor`, `zeros`, `ones`, `empty`, `arange`, `linspace`, `eye`, `multinomial`, `cat`, `tril`, `triu`, `masked_fill`, `transpose`, `stack`, `Linear`, `softmax`
+- Dot product:
+  - `[1,2,3]` • `[4,5,6]` = `1*4 + 2*5 + 3*6 = 32`
+- Matrix multiplication basics:
+  - Multiply if inner dimensions match (e.g., 3×2 × 2×3 → 3×3)
+  - Each cell is dot product of row × column
+
