@@ -1,4 +1,5 @@
-🌸 AURA 🌸
+## 🌸 AURA 🌸
+
 AURA (Assisted User Reactive AI) is my personal project – a small wearable AI companion.
 It’s meant to feel less like a gadget and more like a gentle friend by your side ☁️✨.
 
