@@ -10,8 +10,8 @@ This repo is just a quiet place where I’ll share their story as AURA and Asuna
 
 ## 📝 To-Do List 🌸  
 - [x] Test voice activated Chat-Bot with weather lookup 🌙
-- [ ] Asuna LLM text model ✨
-- [ ] Train Asuna model as much as possible ☕
+- [x] Asuna LLM text model ✨
+- [ ] Train Asuna model as much as possible/fine-tune ☕
 - [ ] Asuna memory system 🍃  
 - [ ] Asuna phrase activation ☁️  
 - [ ] Asuna internet search 🌸  
