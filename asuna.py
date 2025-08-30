@@ -5,6 +5,8 @@ import mmap
 import random
 import pickle
 import argparse
+import datetime
+import os
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu' # use cuda(gpu) if not available use cpu
 print (device)
@@ -13,7 +15,9 @@ block_size = 128 # how many blocks can the model see at once
 n_embd = 384 # creates a 384 attribute embedding_vector
 n_layer = 8
 n_head = 8
-dropout = 0.2 # 20% neurons will be turned off to prevent overfitting 
+dropout = 0.25 # 20% neurons will be turned off to prevent overfitting 
+
+chat_logs = "C:/Users/Uživatel/Documents/GitHub/llm-1-12-18.6.2025/log_files/chat_logs.txt"
 
 chars = ""
 with open ('vocab.txt', 'r', encoding='utf-8') as f: # use text and encode it with utf-8
@@ -159,35 +163,35 @@ class AsunaLanguageModel(nn.Module):
     def generate(self, index, max_new_tokens, temperature=1.0, top_p=None):
         self.eval()
         with torch.no_grad():
+            # interpret position embedding size as block_size (max context length)
+            block_size = self.position_embedding_table.num_embeddings
+
             for _ in range(max_new_tokens):
-                # crop to last allowed context for pos embedding
-                index = index[:, -self.position_embedding_table.num_embeddings:]
+                # do NOT overwrite the full index — create a cropped view for the model input
+                idx_cond = index[:, -block_size:]  # (B, T_cond) used for forward, keeps full 'index' intact
 
                 # debug check before forward
                 vocab_size = self.token_embedding_table.num_embeddings
-                if index.min().item() < 0 or index.max().item() >= vocab_size:
-                    raise IndexError(f"Pre-forward: index out of range: min={int(index.min())}, max={int(index.max())}, vocab={vocab_size}")
+                if idx_cond.min().item() < 0 or idx_cond.max().item() >= vocab_size:
+                    raise IndexError(f"Pre-forward: index out of range: min={int(idx_cond.min())}, max={int(idx_cond.max())}, vocab={vocab_size}")
 
-                logits, _ = self.forward(index)  # (B,T,vocab)
-                logits = logits[:, -1, :]        # (B,vocab)
+                logits, _ = self.forward(idx_cond)  # model forward on the cropped context
+                logits = logits[:, -1, :]           # (B, vocab) -> last token's logits
 
-                # apply temperature
                 logits = logits / temperature
-
-                # convert to probabilities
                 probs = F.softmax(logits, dim=-1)
 
-                # sample next token
                 index_next = torch.multinomial(probs, num_samples=1)  # (B,1)
 
-                # safety clamp / check: multinomial should never return >=vocab_size
                 if index_next.max().item() >= vocab_size or index_next.min().item() < 0:
                     print("index_next problematic:", index_next)
                     raise IndexError(f"Sampled index out of range: {index_next} vs vocab {vocab_size}")
 
+                # append the sampled token to the FULL sequence
                 index = torch.cat((index, index_next), dim=1)
 
         return index
+
 
 
 
@@ -205,8 +209,11 @@ while True:
     context = torch.tensor(encode(prompt), dtype=torch.long, device=device)
     output = decode(m.generate(
                                 context.unsqueeze(0),
-                                max_new_tokens=150,
+                                max_new_tokens=500,
                                 temperature=0.7
                                 )[0].tolist()
                             )
+    with open(chat_logs, 'a') as f:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"[{timestamp}] Prompt: {prompt}\n[{timestamp}] Output: {output}\n")
     print(f'Output:\n{output}')

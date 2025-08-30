@@ -5,6 +5,9 @@ import mmap
 import random
 import pickle
 import argparse
+import datetime
+import os
+import unicodedata
 
 parser = argparse.ArgumentParser(description='')
 
@@ -20,16 +23,19 @@ print (device)
 
 batch_size = int(args.bs)  # how many intigers can the model see at once
 print(f'batch size: {args.bs}')
-block_size = 128 # how many blocks can the model see at once
+block_size = 512 # how many blocks can the model see at once
 max_iters = int(args.itr)
 print(f'max iterations: {args.itr}')
 eval_iters = int(args.evitr)
 print(f'eval iterations: {args.evitr}')
 learning_rate = 3e-4 #3e-4, 3e-3, 1e-4, 1e-3
 n_embd = 384 # creates a 384 attribute embedding_vector
-n_layer = 8
-n_head = 8
-dropout = 0.2 # 20% neurons will be turned off to prevent overfitting 
+n_layer = 4
+n_head = 4
+dropout = 0.2 # 20% neurons will be turned off to prevent overfitting
+
+total_iterations = "C:/Users/Uživatel/Documents/GitHub/llm-1-12-18.6.2025/log_files/total_interations.txt"
+loss_logs = "C:/Users/Uživatel/Documents/GitHub/llm-1-12-18.6.2025/log_files/loss_logs.txt"
 
 chars = ""
 with open ('vocab.txt', 'r', encoding='utf-8') as f: # use text and encode it with utf-8
@@ -38,14 +44,24 @@ with open ('vocab.txt', 'r', encoding='utf-8') as f: # use text and encode it wi
     
 vocab_size = len(chars) # sets the vocab_size to the number of characters in chars
 
+def normalize_text(s: str) -> str:
+    # replace non-breaking spaces with normal space
+    s = s.replace("\xa0", " ")
+    # optional: strip weird control chars (categories starting with 'C')
+    s = ''.join(ch for ch in s if unicodedata.category(ch)[0] != 'C')
+    return s
+
+
+
 string_to_int = { ch:i for i,ch in enumerate(chars) } # make string of characters into intigers (full numbers)
 int_to_string = { i:ch for i,ch in enumerate(chars) } # make intigers into string of characters
-encode = lambda s: [string_to_int[c] for c in s] # encode the characters into the intigers
+unk_id = string_to_int.get("<unk>", 0)
+encode = lambda s: [string_to_int.get(c, unk_id) for c in s] # encode the characters into the intigers
 decode = lambda l: ''.join([int_to_string[i] for i in l]) # decode the intigers into characters
 
 # memory map for using small snippets of text from a single file of any size
 def get_random_chunk(split):
-    filename = "C:/Documents/datasets/openwebtext/train_split.txt" if split == 'train' else "C:/Documents/datasets/openwebtext/val_split.txt"
+    filename = "C:/Documents/datasets/openorca/train_openorca.txt" if split == 'train' else "C:/Documents/datasets/openorca/train_openorca.txt"
     with open(filename, 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
             # determine the filew size and a random position to start reading
@@ -59,6 +75,7 @@ def get_random_chunk(split):
 
             # decode the block to a string ignoring any invalid byte sequences
             decoded_block = block.decode('utf-8', errors='ignore').replace('\r','')
+            decoded_block = normalize_text(decoded_block)
 
             # train and test splits
             data = torch.tensor(encode(decoded_block), dtype=torch.long)
@@ -306,25 +323,47 @@ class AsunaLanguageModel(nn.Module):
 
 model = AsunaLanguageModel(vocab_size) # make the model and tell it how many tokens it can know
 print('Loading model parameters...')
-with open('C:/Documents/model-01.pkl', 'rb') as f:
+with open('C:/Documents/model-01-expanded-512.pkl', 'rb') as f:
    model = pickle.load(f)
+
 print("Model initialized")
 m = model.to(device) # put the model on GPU if available otherwise CPU
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate) # creates AdamW optimizer instance to update the models parameters
 print("Starting training...")
-for iter in range(max_iters): # starts a training loop that runs for the duration of max_iters (1000) each iteration performs an update step
-    if iter % eval_iters == 0:
-        losses = estimate_loss()
-        print(f"step: {iter}, train loss: {losses['train']:.3f}, val loss: {losses['val']:.3f}")
-    
-    xb, yb = get_batch('train') # fetches a batch of input data (xb) and target labels (yb) from training dataset (wiz_of_oz)
-    logits, loss = model.forward(xb, yb)  # passes the input and target batches thrugh the model, returns logits tyhe raw output and the loss scalar comparing the predictions and targets
-    optimizer.zero_grad(set_to_none=True) # clears previos gradients from the model parameters
-    loss.backward() # computes gradients of the loss with respect to all model parameters
-    optimizer.step() # updates model parameters using the computed gradients and the optimizer algorithm
-print(loss.item()) # .item converts the tensor into a readable number 
 
-with open('C:/Documents/model-01.pkl', 'wb') as f:
+try:
+    for iter in range(max_iters): # starts a training loop that runs for the duration of max_iters each iteration performs an update step
+        if iter % eval_iters == 0:
+            losses = estimate_loss()
+            print(f"step: {iter}, train loss: {losses['train']:.3f}, val loss: {losses['val']:.3f}")
+            with open(total_iterations, 'r') as f:
+                total = int(f.read())
+                total += eval_iters
+
+            with open(total_iterations, 'w') as f:
+                f.write(str(total))
+
+            if iter == 0:
+                with open(loss_logs, 'a') as f:
+                    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    f.write(f"\n[{timestamp}] step: {iter}, train loss: {losses['train']:.3f}, val loss: {losses['val']:.3f}\n")
+            else:
+                with open(loss_logs, 'a') as f:
+                    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    f.write(f"[{timestamp}] step: {iter}, train loss: {losses['train']:.3f}, val loss: {losses['val']:.3f}\n")
+        
+        xb, yb = get_batch('train') # fetches a batch of input data (xb) and target labels (yb) from training dataset (wiz_of_oz)
+        logits, loss = model.forward(xb, yb)  # passes the input and target batches thrugh the model, returns logits tyhe raw output and the loss scalar comparing the predictions and targets
+        optimizer.zero_grad(set_to_none=True) # clears previos gradients from the model parameters
+        loss.backward() # computes gradients of the loss with respect to all model parameters
+        optimizer.step() # updates model parameters using the computed gradients and the optimizer algorithm
+    print(loss.item()) # .item converts the tensor into a readable number
+except KeyboardInterrupt:
+    print('Training interrupted!')
+
+# save the model 
+with open('C:/Documents/model-01-expanded-512.pkl', 'wb') as f:
     pickle.dump(model, f)
 print('Model saved')
+print(f'New total iterations: {total}')
