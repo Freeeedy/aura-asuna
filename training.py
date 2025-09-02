@@ -34,8 +34,8 @@ n_layer = 4
 n_head = 4
 dropout = 0.2 # 20% neurons will be turned off to prevent overfitting
 
-total_iterations = "C:/Users/Uživatel/Documents/GitHub/llm-1-12-18.6.2025/log_files/total_interations.txt"
-loss_logs = "C:/Users/Uživatel/Documents/GitHub/llm-1-12-18.6.2025/log_files/loss_logs.txt"
+total_iterations = "log_files/total_interations.txt"
+loss_logs = "log_files/loss_logs.txt"
 
 chars = ""
 with open ('vocab.txt', 'r', encoding='utf-8') as f: # use text and encode it with utf-8

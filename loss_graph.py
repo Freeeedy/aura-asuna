@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import re
 import numpy as np
 
-log_file = "C:/Users/Uživatel/Documents/GitHub/llm-1-12-18.6.2025/log_files/loss_logs.txt"
+log_file = "log_files/loss_logs.txt"
 
 steps = []
 train_losses = []
