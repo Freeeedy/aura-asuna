@@ -7,6 +7,7 @@ import pickle
 import argparse
 import datetime
 import os
+import unicodedata
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu' # use cuda(gpu) if not available use cpu
 print (device)
@@ -28,8 +29,19 @@ vocab_size = len(chars) # sets the vocab_size to the number of characters in cha
 
 string_to_int = { ch:i for i,ch in enumerate(chars) } # make string of characters into intigers (full numbers)
 int_to_string = { i:ch for i,ch in enumerate(chars) } # make intigers into string of characters
-encode = lambda s: [string_to_int[c] for c in s] # encode the characters into the intigers
+unk_id = string_to_int.get('<unk>', 0) # unknown character id
+encode = lambda s: [string_to_int.get(c, unk_id) for c in s] # encode the characters into intigers
 decode = lambda l: ''.join([int_to_string[i] for i in l]) # decode the intigers into characters
+
+SPECIAL_CHARS = {'\x00', '\x01', '\x02'}
+
+def normalize_text(s: str) -> str:
+    s = s.replace("\xa0", " ")
+    s = ''.join(
+        ch for ch in s
+        if (unicodedata.category(ch)[0] != 'C') or (ch in SPECIAL_CHARS)
+    )
+    return s
 
 class Head(nn.Module):
     """ one head of self-attention """
@@ -192,28 +204,43 @@ class AsunaLanguageModel(nn.Module):
 
         return index
 
-
-
-
 print('Loading model parameters...')
-with open('C:/Documents/model-01.pkl', 'rb') as f:
+with open('C:/Documents/model-01-expanded-512.pkl', 'rb') as f:
     model = pickle.load(f)
 print("Model initialized")
 m = model.to(device).eval() # put the model on GPU if available otherwise CPU
 
+EOS = '\x00'
+USER = '\x01'
+ASSISTANT = '\x02'
 
 while True:
     prompt = input("Prompt:\n")
+    prompt = normalize_text(prompt)
     if prompt.strip().lower() in ('exit', 'quit'):
         break
-    context = torch.tensor(encode(prompt), dtype=torch.long, device=device)
-    output = decode(m.generate(
-                                context.unsqueeze(0),
-                                max_new_tokens=500,
-                                temperature=0.7
-                                )[0].tolist()
-                            )
-    with open(chat_logs, 'a') as f:
+
+    structured_prompt = f"{USER}{prompt}{ASSISTANT}"
+    context = torch.tensor(encode(structured_prompt), dtype=torch.long, device=device)
+    output_ids = m.generate(
+        context.unsqueeze(0),
+        max_new_tokens=1000,
+        temperature=0.8
+    )[0].tolist()
+
+    decoded = decode(output_ids)
+
+    # keep only assistant output
+    if ASSISTANT in decoded:
+        decoded = decoded.split(ASSISTANT, 1)[1]
+
+    # stop at EOS
+    if EOS in decoded:
+        decoded = decoded.split(EOS, 1)[0]
+
+    
+    with open(chat_logs, 'a', encoding='utf-8', errors='replace') as f:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"[{timestamp}] Prompt: {prompt}\n[{timestamp}] Output: {output}\n")
-    print(f'Output:\n{output}')
+        f.write(f"[{timestamp}] Prompt: {prompt}\n[{timestamp}] Output: {decoded}\n")
+
+    print(f'Output:\n{decoded}')

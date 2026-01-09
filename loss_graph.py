@@ -41,7 +41,7 @@ plt.plot(steps, val_percent, label="Val correct %", color="orange")
 plt.title("All losses from most runs") # graph title obv. 
 plt.xlabel("Steps (every log entry is one step)") # x-axis label
 plt.ylabel("Loss/%") # y-axis label
-plt.ylim(0, 2.5) # makes y-axis 0-1.5
+plt.ylim(0, 4) # makes y-axis 0-1.5
 plt.legend() # display the legend (green=val etc.)
 plt.grid(True) # display grid to see values better
 plt.tight_layout() # adjusts padding so it doesnt overlap

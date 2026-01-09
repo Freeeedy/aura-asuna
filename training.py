@@ -8,6 +8,8 @@ import argparse
 import datetime
 import os
 import unicodedata
+import psutil
+import GPUtil
 
 parser = argparse.ArgumentParser(description='')
 
@@ -28,11 +30,15 @@ max_iters = int(args.itr)
 print(f'max iterations: {args.itr}')
 eval_iters = int(args.evitr)
 print(f'eval iterations: {args.evitr}')
-learning_rate = 3e-4 #3e-4, 3e-3, 1e-4, 1e-3
+learning_rate = 1e-4 #3e-4, 3e-3, 1e-4, 1e-3
 n_embd = 384 # creates a 384 attribute embedding_vector
 n_layer = 4
 n_head = 4
 dropout = 0.2 # 20% neurons will be turned off to prevent overfitting
+
+ram_usage_percent = psutil.virtual_memory().percent
+gpu = GPUtil.getGPUs()[0]  # first GPU
+gpu_usage_percent = gpu.load * 100  # convert from 0-1 to %
 
 total_iterations = "log_files/total_interations.txt"
 loss_logs = "log_files/loss_logs.txt"
@@ -44,13 +50,15 @@ with open ('vocab.txt', 'r', encoding='utf-8') as f: # use text and encode it wi
     
 vocab_size = len(chars) # sets the vocab_size to the number of characters in chars
 
-def normalize_text(s: str) -> str:
-    # replace non-breaking spaces with normal space
-    s = s.replace("\xa0", " ")
-    # optional: strip weird control chars (categories starting with 'C')
-    s = ''.join(ch for ch in s if unicodedata.category(ch)[0] != 'C')
-    return s
+SPECIAL_CHARS = {'\x00', '\x01', '\x02'}
 
+def normalize_text(s: str) -> str:
+    s = s.replace("\xa0", " ")
+    s = ''.join(
+        ch for ch in s
+        if (unicodedata.category(ch)[0] != 'C') or (ch in SPECIAL_CHARS)
+    )
+    return s
 
 
 string_to_int = { ch:i for i,ch in enumerate(chars) } # make string of characters into intigers (full numbers)
@@ -61,7 +69,7 @@ decode = lambda l: ''.join([int_to_string[i] for i in l]) # decode the intigers 
 
 # memory map for using small snippets of text from a single file of any size
 def get_random_chunk(split):
-    filename = "C:/Documents/datasets/openorca/train_openorca.txt" if split == 'train' else "C:/Documents/datasets/openorca/train_openorca.txt"
+    filename = "C:/Documents/datasets/alpaca/stage2_train.txt" if split == 'train' else "C:/Documents/datasets/alpaca/stage2_val.txt"
     with open(filename, 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
             # determine the filew size and a random position to start reading
@@ -336,7 +344,7 @@ try:
     for iter in range(max_iters): # starts a training loop that runs for the duration of max_iters each iteration performs an update step
         if iter % eval_iters == 0:
             losses = estimate_loss()
-            print(f"step: {iter}, train loss: {losses['train']:.3f}, val loss: {losses['val']:.3f}")
+            print(f"step: {iter}, train loss: {losses['train']:.3f}, val loss: {losses['val']:.3f}, RAM usage: {ram_usage_percent}%, GPU usage: {gpu_usage_percent:.1f}%")
             with open(total_iterations, 'r') as f:
                 total = int(f.read())
                 total += eval_iters
@@ -353,7 +361,7 @@ try:
                     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     f.write(f"[{timestamp}] step: {iter}, train loss: {losses['train']:.3f}, val loss: {losses['val']:.3f}\n")
         
-        xb, yb = get_batch('train') # fetches a batch of input data (xb) and target labels (yb) from training dataset (wiz_of_oz)
+        xb, yb = get_batch('train') # fetches a batch of input data (xb) and target labels (yb) 
         logits, loss = model.forward(xb, yb)  # passes the input and target batches thrugh the model, returns logits tyhe raw output and the loss scalar comparing the predictions and targets
         optimizer.zero_grad(set_to_none=True) # clears previos gradients from the model parameters
         loss.backward() # computes gradients of the loss with respect to all model parameters
