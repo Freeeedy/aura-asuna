@@ -69,7 +69,7 @@ decode = lambda l: ''.join([int_to_string[i] for i in l]) # decode the intigers 
 
 # memory map for using small snippets of text from a single file of any size
 def get_random_chunk(split):
-    filename = "C:/Documents/datasets/alpaca/stage2_train.txt" if split == 'train' else "C:/Documents/datasets/alpaca/stage2_val.txt"
+    filename = "C:/Documents/datasets/lamini/stage3_train.txt" if split == 'train' else "C:/Documents/datasets/lamini/stage3_val.txt"
     with open(filename, 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
             # determine the filew size and a random position to start reading

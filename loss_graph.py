@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import re
 import numpy as np
+import os
+
+os.environ["QT_LOGGING_RULES"] = "*.debug=false;qt.qpa.*=false"
 
 log_file = "log_files/loss_logs.txt"
 
@@ -38,6 +41,8 @@ plt.plot(steps, val_losses, label="Val loss", color="red") # val line
 plt.plot(steps, train_percent, label="Train correct %",color="green")
 plt.plot(steps, val_percent, label="Val correct %", color="orange")
 
+plt.axvline(x=287.5, color='black', linestyle='--', linewidth=1, label='Alpaca dataset start')
+plt.axvline(x=345.5, color='black', linestyle='--', linewidth=1, label='LaMini dataset start')
 plt.title("All losses from most runs") # graph title obv. 
 plt.xlabel("Steps (every log entry is one step)") # x-axis label
 plt.ylabel("Loss/%") # y-axis label

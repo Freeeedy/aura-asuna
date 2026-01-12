@@ -14,8 +14,8 @@ print (device)
 
 block_size = 128 # how many blocks can the model see at once
 n_embd = 384 # creates a 384 attribute embedding_vector
-n_layer = 8
-n_head = 8
+n_layer = 12
+n_head = 12
 dropout = 0.25 # 20% neurons will be turned off to prevent overfitting 
 
 chat_logs = "log_files/chat_logs.txt"
@@ -172,37 +172,61 @@ class AsunaLanguageModel(nn.Module):
         # Return both the guesses and the loss (loss is None during generation)
         return logits, loss
 
-    def generate(self, index, max_new_tokens, temperature=1.0, top_p=None):
+    def generate(self, index, max_new_tokens, temperature=1.0, top_k=40, top_p=0.9):
         self.eval()
         with torch.no_grad():
-            # interpret position embedding size as block_size (max context length)
             block_size = self.position_embedding_table.num_embeddings
 
             for _ in range(max_new_tokens):
-                # do NOT overwrite the full index — create a cropped view for the model input
-                idx_cond = index[:, -block_size:]  # (B, T_cond) used for forward, keeps full 'index' intact
+                idx_cond = index[:, -block_size:]
 
-                # debug check before forward
                 vocab_size = self.token_embedding_table.num_embeddings
                 if idx_cond.min().item() < 0 or idx_cond.max().item() >= vocab_size:
-                    raise IndexError(f"Pre-forward: index out of range: min={int(idx_cond.min())}, max={int(idx_cond.max())}, vocab={vocab_size}")
+                    raise IndexError(
+                        f"Pre-forward: index out of range: "
+                        f"min={int(idx_cond.min())}, max={int(idx_cond.max())}, vocab={vocab_size}"
+                    )
 
-                logits, _ = self.forward(idx_cond)  # model forward on the cropped context
-                logits = logits[:, -1, :]           # (B, vocab) -> last token's logits
+                logits, _ = self.forward(idx_cond)
+                logits = logits[:, -1, :]  # (B, vocab)
 
-                logits = logits / temperature
+                # -------- sampling --------
+                logits = logits / max(temperature, 1e-8)
+
+                # top-k
+                if top_k is not None:
+                    values, _ = torch.topk(logits, top_k)
+                    min_values = values[:, -1].unsqueeze(1)
+                    logits = torch.where(logits < min_values, float('-inf'), logits)
+
+                # top-p (nucleus)
+                if top_p is not None:
+                    sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+                    probs = F.softmax(sorted_logits, dim=-1)
+                    cum_probs = torch.cumsum(probs, dim=-1)
+
+                    cutoff = cum_probs > top_p
+                    cutoff[..., 1:] = cutoff[..., :-1].clone()
+                    cutoff[..., 0] = False
+
+                    sorted_logits[cutoff] = float('-inf')
+                    logits = torch.zeros_like(logits).scatter(
+                        1, sorted_indices, sorted_logits
+                    )
+
                 probs = F.softmax(logits, dim=-1)
-
-                index_next = torch.multinomial(probs, num_samples=1)  # (B,1)
+                index_next = torch.multinomial(probs, num_samples=1)
+                # --------------------------
 
                 if index_next.max().item() >= vocab_size or index_next.min().item() < 0:
-                    print("index_next problematic:", index_next)
-                    raise IndexError(f"Sampled index out of range: {index_next} vs vocab {vocab_size}")
+                    raise IndexError(
+                        f"Sampled index out of range: {index_next} vs vocab {vocab_size}"
+                    )
 
-                # append the sampled token to the FULL sequence
                 index = torch.cat((index, index_next), dim=1)
 
         return index
+
 
 print('Loading model parameters...')
 with open('C:/Documents/model-01-expanded-512.pkl', 'rb') as f:
@@ -224,8 +248,10 @@ while True:
     context = torch.tensor(encode(structured_prompt), dtype=torch.long, device=device)
     output_ids = m.generate(
         context.unsqueeze(0),
-        max_new_tokens=1000,
-        temperature=0.8
+        max_new_tokens=2500,
+        temperature=0.6,
+        top_k=40,
+        top_p=0.9
     )[0].tolist()
 
     decoded = decode(output_ids)
