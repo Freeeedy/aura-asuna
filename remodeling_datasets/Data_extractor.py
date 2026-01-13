@@ -1,54 +1,104 @@
 import os
-import lzma
-from tqdm import tqdm
-import concurrent.futures
-import random
+import csv
+import re
 
-def xz_files_in_dir(directory):
-    files = []
-    for filename in os.listdir(directory):
-        if filename.endswith(".xz") and os.path.isfile(os.path.join(directory, filename)):
-            files.append(filename)
-    return files
+# =============================
+# FILE PATHS
+# =============================
 
-folder_path = "C:/Users/Uživatel/Downloads/urlsf_subset01/openwebtext"
-output_file_train = "output_train.txt"
-output_file_val = "output_val.txt"
-vocab_file = "vocab.txt"
+INPUT_FILE = "C:/Documents/datasets/output.txt"
 
+OUT_DIR = "C:/Documents/datasets/"
+TRAIN_FILE = os.path.join(OUT_DIR, "stage3_train.txt")
+VAL_FILE   = os.path.join(OUT_DIR, "stage3_val.txt")
 
-files = xz_files_in_dir(folder_path)
-total_files = len(files)
+os.makedirs(OUT_DIR, exist_ok=True)
 
-# calculate the split indices
-split_index = int(total_files * 0.9) # 90% for training
-files_train = files[:split_index]
-files_val = files[split_index:]
+# =============================
+# SPECIAL TOKENS (MUST MATCH MODEL)
+# =============================
 
-# process the files for training and validation separetely
-vocab = set()
+USER = "\x01"
+ASSISTANT = "\x02"
+EOS = "\x00"
 
-# process the training files
-with open(output_file_train, "w", encoding="utf-8") as outfile:
-    for filename in tqdm(files_train, total=len(files_train)):
-        file_path = os.path.join(folder_path, filename)
-        with lzma.open(file_path, "rt", encoding="utf-8", errors="ignore") as infile:
-            text = infile.read()
-            outfile.write(text)
-            characters = set(text)
-            vocab.update(set(text))
+# =============================
+# CLEANING
+# =============================
 
-# process the validation files
-with open(output_file_val, "w", encoding="utf-8") as outfile:
-    for filename in tqdm(files_val, total=len(files_val)):
-        file_path = os.path.join(folder_path, filename)
-        with lzma.open(file_path, "rt", encoding="utf-8", errors="ignore") as infile:
-            text = infile.read()
-            outfile.write(text)
-            characters = set(text)
-            vocab.update(set(text))
+def clean(s):
+    if s is None:
+        return ""
 
-# write the vocab to vocab.txt
-with open(vocab_file, "w", encoding="utf-8") as vfile:
-    for char in vocab:
-        vfile.write(char + '\n')
+    s = s.strip()
+
+    # remove surrounding quotes
+    if s.startswith('"') and s.endswith('"'):
+        s = s[1:-1]
+
+    # remove Task: and Output: everywhere (case-insensitive)
+    s = re.sub(r'\bTask:\s*', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bOutput:\s*', '', s, flags=re.IGNORECASE)
+
+    # normalize whitespace
+    s = re.sub(r'\n{3,}', '\n\n', s)
+
+    return s.strip()
+
+# =============================
+# LOAD TSV
+# =============================
+
+print("Loading output.txt...")
+
+rows = []
+with open(INPUT_FILE, "r", encoding="utf-8", errors="ignore") as f:
+    reader = csv.reader(f, delimiter="\t")
+    for row in reader:
+        if len(row) < 2:
+            continue
+
+        instr = clean(row[0])
+        out   = clean(row[1])
+
+        if not instr or not out:
+            continue
+
+        rows.append((instr, out))
+
+print("Total valid samples:", len(rows))
+
+# =============================
+# WRITE TRAIN / VAL
+# =============================
+
+train_written = 0
+val_written = 0
+total = 0
+
+with open(TRAIN_FILE, "w", encoding="utf-8") as train_f, \
+     open(VAL_FILE, "w", encoding="utf-8") as val_f:
+
+    for instr, out in rows:
+        line = f"{USER}{instr}{ASSISTANT}{out}{EOS}\n"
+
+        # deterministic 90/10 split
+        if total % 10 == 0:
+            val_f.write(line)
+            val_written += 1
+        else:
+            train_f.write(line)
+            train_written += 1
+
+        total += 1
+
+# =============================
+# DONE
+# =============================
+
+print("DONE")
+print("Train samples:", train_written)
+print("Validation samples:", val_written)
+print("Files written:")
+print(TRAIN_FILE)
+print(VAL_FILE)

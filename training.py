@@ -30,7 +30,7 @@ max_iters = int(args.itr)
 print(f'max iterations: {args.itr}')
 eval_iters = int(args.evitr)
 print(f'eval iterations: {args.evitr}')
-learning_rate = 1e-4 #3e-4, 3e-3, 1e-4, 1e-3
+learning_rate = 1e-5 #3e-4, 3e-3, 1e-4, 1e-3
 n_embd = 384 # creates a 384 attribute embedding_vector
 n_layer = 4
 n_head = 4
@@ -69,7 +69,7 @@ decode = lambda l: ''.join([int_to_string[i] for i in l]) # decode the intigers 
 
 # memory map for using small snippets of text from a single file of any size
 def get_random_chunk(split):
-    filename = "C:/Documents/datasets/lamini/stage3_train.txt" if split == 'train' else "C:/Documents/datasets/lamini/stage3_val.txt"
+    filename = "C:/Documents/datasets/self-instruct/stage3_train.txt" if split == 'train' else "C:/Documents/datasets/self-instruct/stage3_val.txt"
     with open(filename, 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
             # determine the filew size and a random position to start reading
