@@ -12,7 +12,7 @@ Together, they’re meant to interact naturally through voice and gestures, help
 - [ ] Asuna memory system 🍃  
 - [ ] Asuna phrase activation ☁️  
 - [ ] Asuna internet search 🌸  
-- [ ] Asuna cute TTS 🪐
+- [ ] Asuna TTS 🪐
 - [ ] Asuna screen vision/object recognition ☀️
 - [ ] Asuna discord bot 🌱
 - [ ] Offline mode Chat-bot with partial memory 🌷
@@ -27,4 +27,3 @@ Together, they’re meant to interact naturally through voice and gestures, help
 - [ ] Voice recognition 💡
 
 **Note:** This project is heavily inspired by the excellent [freeCodeCamp tutorial on YouTube](https://youtu.be/UU1WVnMk4E8?si=RFoWFriBz7M5Bx0R).
-Development is currently paused, but I plan to continue working on it when I have more time.
