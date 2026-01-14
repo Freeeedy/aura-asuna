@@ -44,6 +44,7 @@ plt.plot(steps, val_percent, label="Val correct %", color="orange")
 plt.axvline(x=287.5, color='black', linestyle='--', linewidth=1, label='Alpaca dataset start')
 plt.axvline(x=345.5, color='black', linestyle='--', linewidth=1, label='LaMini dataset start')
 plt.axvline(x=405, color='black', linestyle='--', linewidth=1, label='self-instruct dataset start')
+plt.axvline(x=429, color='black', linestyle='--', linewidth=1, label='self-instruct2 dataset start')
 plt.title("All losses from most runs") # graph title obv. 
 plt.xlabel("Steps (every log entry is one step)") # x-axis label
 plt.ylabel("Loss/%") # y-axis label

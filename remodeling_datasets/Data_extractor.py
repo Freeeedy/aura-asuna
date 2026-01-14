@@ -1,104 +1,45 @@
-import os
-import csv
-import re
+# split_dataset_straight.py
 
-# =============================
-# FILE PATHS
-# =============================
+INPUT_FILE = r"C:/Documents/datasets/my/dataset_examples_converted.txt"  # replace with your actual path
+TRAIN_FILE = r"C:/Documents/datasets/my/train1.txt"
+VAL_FILE = r"C:/Documents/datasets/my/val1.txt"
 
-INPUT_FILE = "C:/Documents/datasets/output.txt"
+# ===== READ FILE =====
+with open(INPUT_FILE, "r", encoding="utf-8") as f:
+    lines = f.readlines()
 
-OUT_DIR = "C:/Documents/datasets/"
-TRAIN_FILE = os.path.join(OUT_DIR, "stage3_train.txt")
-VAL_FILE   = os.path.join(OUT_DIR, "stage3_val.txt")
-
-os.makedirs(OUT_DIR, exist_ok=True)
-
-# =============================
-# SPECIAL TOKENS (MUST MATCH MODEL)
-# =============================
-
-USER = "\x01"
-ASSISTANT = "\x02"
-EOS = "\x00"
-
-# =============================
-# CLEANING
-# =============================
-
-def clean(s):
-    if s is None:
-        return ""
-
-    s = s.strip()
-
-    # remove surrounding quotes
-    if s.startswith('"') and s.endswith('"'):
-        s = s[1:-1]
-
-    # remove Task: and Output: everywhere (case-insensitive)
-    s = re.sub(r'\bTask:\s*', '', s, flags=re.IGNORECASE)
-    s = re.sub(r'\bOutput:\s*', '', s, flags=re.IGNORECASE)
-
-    # normalize whitespace
-    s = re.sub(r'\n{3,}', '\n\n', s)
-
-    return s.strip()
-
-# =============================
-# LOAD TSV
-# =============================
-
-print("Loading output.txt...")
-
-rows = []
-with open(INPUT_FILE, "r", encoding="utf-8", errors="ignore") as f:
-    reader = csv.reader(f, delimiter="\t")
-    for row in reader:
-        if len(row) < 2:
-            continue
-
-        instr = clean(row[0])
-        out   = clean(row[1])
-
-        if not instr or not out:
-            continue
-
-        rows.append((instr, out))
-
-print("Total valid samples:", len(rows))
-
-# =============================
-# WRITE TRAIN / VAL
-# =============================
-
-train_written = 0
-val_written = 0
-total = 0
-
-with open(TRAIN_FILE, "w", encoding="utf-8") as train_f, \
-     open(VAL_FILE, "w", encoding="utf-8") as val_f:
-
-    for instr, out in rows:
-        line = f"{USER}{instr}{ASSISTANT}{out}{EOS}\n"
-
-        # deterministic 90/10 split
-        if total % 10 == 0:
-            val_f.write(line)
-            val_written += 1
+# ===== GROUP INTO BLOCKS (question + answer) =====
+blocks = []
+i = 0
+while i < len(lines):
+    if lines[i].strip():  # skip empty lines
+        if i + 1 < len(lines):
+            block = lines[i:i+2]  # question + answer
+            blocks.append(block)
+            i += 2
         else:
-            train_f.write(line)
-            train_written += 1
+            blocks.append([lines[i]])
+            i += 1
+    else:
+        i += 1
 
-        total += 1
+print(f"Total blocks found: {len(blocks)}")
 
-# =============================
-# DONE
-# =============================
+# ===== SPLIT 90/10 =====
+split_idx = int(len(blocks) * 0.9)
+train_blocks = blocks[:split_idx]
+val_blocks = blocks[split_idx:]
 
-print("DONE")
-print("Train samples:", train_written)
-print("Validation samples:", val_written)
-print("Files written:")
-print(TRAIN_FILE)
-print(VAL_FILE)
+# ===== WRITE FILES =====
+with open(TRAIN_FILE, "w", encoding="utf-8") as f:
+    for block in train_blocks:
+        f.writelines(block)
+
+with open(VAL_FILE, "w", encoding="utf-8") as f:
+    for block in val_blocks:
+        f.writelines(block)
+
+print(f"Train blocks: {len(train_blocks)}")
+print(f"Validation blocks: {len(val_blocks)}")
+print(f"Train file: {TRAIN_FILE}")
+print(f"Validation file: {VAL_FILE}")

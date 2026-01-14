@@ -172,7 +172,7 @@ class AsunaLanguageModel(nn.Module):
         # Return both the guesses and the loss (loss is None during generation)
         return logits, loss
 
-    def generate(self, index, max_new_tokens, temperature=1.0, top_k=40, top_p=0.9):
+    def generate(self, index, max_new_tokens, temperature=1.0, top_k=40, top_p=0.9, repetition_penalty=1.2):
         self.eval()
         with torch.no_grad():
             block_size = self.position_embedding_table.num_embeddings
@@ -189,6 +189,19 @@ class AsunaLanguageModel(nn.Module):
 
                 logits, _ = self.forward(idx_cond)
                 logits = logits[:, -1, :]  # (B, vocab)
+
+                # repetition penalty
+                window = 128  # or block_size
+                if repetition_penalty != 1.0:
+                    for b in range(logits.size(0)):
+                        recent = index[b, -window:].tolist()
+                        seen_tokens = set(recent)
+                        for token_id in seen_tokens:
+                            if logits[b, token_id] > 0:
+                                logits[b, token_id] /= repetition_penalty
+                            else:
+                                logits[b, token_id] *= repetition_penalty
+
 
                 # -------- sampling --------
                 logits = logits / max(temperature, 1e-8)
@@ -250,8 +263,9 @@ while True:
         context.unsqueeze(0),
         max_new_tokens=2500,
         temperature=0.6,
-        top_k=40,
-        top_p=0.9
+        top_k=50,
+        top_p=0.9,
+        repetition_penalty=1.1
     )[0].tolist()
 
     decoded = decode(output_ids)

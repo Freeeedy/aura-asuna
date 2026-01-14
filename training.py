@@ -30,10 +30,10 @@ max_iters = int(args.itr)
 print(f'max iterations: {args.itr}')
 eval_iters = int(args.evitr)
 print(f'eval iterations: {args.evitr}')
-learning_rate = 1e-5 #3e-4, 3e-3, 1e-4, 1e-3
+learning_rate = 3e-4 #3e-4, 3e-3, 1e-4, 1e-3
 n_embd = 384 # creates a 384 attribute embedding_vector
-n_layer = 4
-n_head = 4
+n_layer = 12
+n_head = 12
 dropout = 0.2 # 20% neurons will be turned off to prevent overfitting
 
 ram_usage_percent = psutil.virtual_memory().percent
@@ -69,7 +69,7 @@ decode = lambda l: ''.join([int_to_string[i] for i in l]) # decode the intigers 
 
 # memory map for using small snippets of text from a single file of any size
 def get_random_chunk(split):
-    filename = "C:/Documents/datasets/self-instruct/stage3_train.txt" if split == 'train' else "C:/Documents/datasets/self-instruct/stage3_val.txt"
+    filename = "C:/Documents/datasets/my/train1.txt" if split == 'train' else "C:/Documents/datasets/my/val1.txt"
     with open(filename, 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
             # determine the filew size and a random position to start reading
@@ -295,34 +295,69 @@ class AsunaLanguageModel(nn.Module):
         # Return both the guesses and the loss (loss is None during generation)
         return logits, loss
 
-    def generate(self, index, max_new_tokens, temperature=1.0, top_p=None):
+    def generate(self, index, max_new_tokens, temperature=1.0, top_k=40, top_p=0.9, repetition_penalty=1.2):
         self.eval()
         with torch.no_grad():
+            block_size = self.position_embedding_table.num_embeddings
+
             for _ in range(max_new_tokens):
-                # crop to last allowed context for pos embedding
-                index = index[:, -self.position_embedding_table.num_embeddings:]
+                idx_cond = index[:, -block_size:]
 
-                # debug check before forward
                 vocab_size = self.token_embedding_table.num_embeddings
-                if index.min().item() < 0 or index.max().item() >= vocab_size:
-                    raise IndexError(f"Pre-forward: index out of range: min={int(index.min())}, max={int(index.max())}, vocab={vocab_size}")
+                if idx_cond.min().item() < 0 or idx_cond.max().item() >= vocab_size:
+                    raise IndexError(
+                        f"Pre-forward: index out of range: "
+                        f"min={int(idx_cond.min())}, max={int(idx_cond.max())}, vocab={vocab_size}"
+                    )
 
-                logits, _ = self.forward(index)  # (B,T,vocab)
-                logits = logits[:, -1, :]        # (B,vocab)
+                logits, _ = self.forward(idx_cond)
+                logits = logits[:, -1, :]  # (B, vocab)
 
-                # apply temperature
-                logits = logits / temperature
+                # repetition penalty
+                window = 128  # or block_size
+                if repetition_penalty != 1.0:
+                    for b in range(logits.size(0)):
+                        recent = index[b, -window:].tolist()
+                        seen_tokens = set(recent)
+                        for token_id in seen_tokens:
+                            if logits[b, token_id] > 0:
+                                logits[b, token_id] /= repetition_penalty
+                            else:
+                                logits[b, token_id] *= repetition_penalty
 
-                # convert to probabilities
+
+                # -------- sampling --------
+                logits = logits / max(temperature, 1e-8)
+
+                # top-k
+                if top_k is not None:
+                    values, _ = torch.topk(logits, top_k)
+                    min_values = values[:, -1].unsqueeze(1)
+                    logits = torch.where(logits < min_values, float('-inf'), logits)
+
+                # top-p (nucleus)
+                if top_p is not None:
+                    sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+                    probs = F.softmax(sorted_logits, dim=-1)
+                    cum_probs = torch.cumsum(probs, dim=-1)
+
+                    cutoff = cum_probs > top_p
+                    cutoff[..., 1:] = cutoff[..., :-1].clone()
+                    cutoff[..., 0] = False
+
+                    sorted_logits[cutoff] = float('-inf')
+                    logits = torch.zeros_like(logits).scatter(
+                        1, sorted_indices, sorted_logits
+                    )
+
                 probs = F.softmax(logits, dim=-1)
+                index_next = torch.multinomial(probs, num_samples=1)
+                # --------------------------
 
-                # sample next token
-                index_next = torch.multinomial(probs, num_samples=1)  # (B,1)
-
-                # safety clamp / check: multinomial should never return >=vocab_size
                 if index_next.max().item() >= vocab_size or index_next.min().item() < 0:
-                    print("index_next problematic:", index_next)
-                    raise IndexError(f"Sampled index out of range: {index_next} vs vocab {vocab_size}")
+                    raise IndexError(
+                        f"Sampled index out of range: {index_next} vs vocab {vocab_size}"
+                    )
 
                 index = torch.cat((index, index_next), dim=1)
 
