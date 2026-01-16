@@ -10,6 +10,7 @@ import os
 import unicodedata
 import psutil
 import GPUtil
+from transformers import GPT2Tokenizer
 
 parser = argparse.ArgumentParser(description='')
 
@@ -30,7 +31,7 @@ max_iters = int(args.itr)
 print(f'max iterations: {args.itr}')
 eval_iters = int(args.evitr)
 print(f'eval iterations: {args.evitr}')
-learning_rate = 3e-4 #3e-4, 3e-3, 1e-4, 1e-3
+learning_rate = 1e-4 #3e-4, 3e-3, 1e-4, 1e-3
 n_embd = 384 # creates a 384 attribute embedding_vector
 n_layer = 12
 n_head = 12
@@ -43,14 +44,15 @@ gpu_usage_percent = gpu.load * 100  # convert from 0-1 to %
 total_iterations = "log_files/total_interations.txt"
 loss_logs = "log_files/loss_logs.txt"
 
-chars = ""
-with open ('vocab.txt', 'r', encoding='utf-8') as f: # use text and encode it with utf-8
-        text = f.read() # let the script read the text
-        chars = sorted(list(set(text))) # sort all used characters in text
-    
-vocab_size = len(chars) # sets the vocab_size to the number of characters in chars
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 
 SPECIAL_CHARS = {'\x00', '\x01', '\x02'}
+tokenizer.add_tokens(["\x00", "\x01", "\x02"])
+
+tokenizer.pad_token = "\x00"
+tokenizer.eos_token = "\x00"
+
+vocab_size = len(tokenizer)
 
 def normalize_text(s: str) -> str:
     s = s.replace("\xa0", " ")
@@ -60,16 +62,15 @@ def normalize_text(s: str) -> str:
     )
     return s
 
+def encode(text):
+    return tokenizer.encode(text, add_special_tokens=False)
 
-string_to_int = { ch:i for i,ch in enumerate(chars) } # make string of characters into intigers (full numbers)
-int_to_string = { i:ch for i,ch in enumerate(chars) } # make intigers into string of characters
-unk_id = string_to_int.get("<unk>", 0)
-encode = lambda s: [string_to_int.get(c, unk_id) for c in s] # encode the characters into the intigers
-decode = lambda l: ''.join([int_to_string[i] for i in l]) # decode the intigers into characters
+def decode(ids):
+    return tokenizer.decode(ids, skip_special_tokens=True)
 
 # memory map for using small snippets of text from a single file of any size
 def get_random_chunk(split):
-    filename = "C:/Documents/datasets/my/train1.txt" if split == 'train' else "C:/Documents/datasets/my/val1.txt"
+    filename = "C:/Documents/datasets/alpaca/stage2_train.txt" if split == 'train' else "C:/Documents/datasets/alpaca/stage2_val.txt"
     with open(filename, 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
             # determine the filew size and a random position to start reading
@@ -84,18 +85,28 @@ def get_random_chunk(split):
             # decode the block to a string ignoring any invalid byte sequences
             decoded_block = block.decode('utf-8', errors='ignore').replace('\r','')
             decoded_block = normalize_text(decoded_block)
+            decoded_block = decoded_block.rsplit("\x00", 1)[0] + "\x00"
 
             # train and test splits
-            data = torch.tensor(encode(decoded_block), dtype=torch.long)
+            tokens = encode(decoded_block)
 
-    return data
+            # Clip to maximum block_size
+            if len(tokens) > block_size * batch_size:
+                tokens = tokens[: block_size * batch_size]
+            elif len(tokens) < block_size + 1:
+                return get_random_chunk(split)  # resample small chunk
+
+        return torch.tensor(tokens, dtype=torch.long)
  
 def get_batch(split): # defines a function called get_batch that takes a single argument split, which tells us whether to use the training or validation data
     data = get_random_chunk(split)
-    ix = torch.randint(len(data) - block_size, (batch_size,)) # Each index i represents the start of a chunk of length block_size. We subtract block_size to ensure we don’t go out of bounds.
-    #print(ix)
-    x = torch.stack([data[i:i+block_size] for i in ix]) # For each index i in ix, it slices a chunk from data of length block_size. Then stacks them into a tensor of shape (batch_size, block_size)
-    y = torch.stack([data[i+1:i+block_size+1]for i in ix]) # This creates the target batch y, which is the same as x but shifted by one token to the right.The model will try to predict each next token in y given the corresponding token in x
+    # ensure data is big enough
+    if len(data) <= block_size:
+        return get_batch(split)
+
+    ix = torch.randint(0, len(data) - block_size, (batch_size,))
+    x = torch.stack([data[i:i+block_size] for i in ix])
+    y = torch.stack([data[i+1:i+block_size+1] for i in ix])
     x, y = x.to(device), y.to(device)
     return x, y
 
@@ -112,7 +123,7 @@ def estimate_loss():
             losses[k] = loss.item()
         out[split] = losses.mean()
     model.train() # switches to training mode, enables dropout
-    return out\
+    return out
 
 class Head(nn.Module):
     """ one head of self-attention """
@@ -190,58 +201,6 @@ class Block(nn.Module): # decoder
         y = self.ffwd(x) # feed forward third 
         x = self.ln2(x + y) # last layer norm (residual connection add the norm) again 
         return x
-        
-class AsunaLanguageModel(nn.Module):
-    def __init__(self, vocab_size):
-        super().__init__()
-        # This creates a table that turns each word into a prediction for the next word.
-        # It's like saying: "If I see word X, what word should come next?"
-        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
-        #the same as token embedding but not every char has its own embed but each letter index has its own embed
-        self.position_embedding_table = nn.Embedding(block_size, n_embd)
-        # how many decoder blocks we have running sequentialy / layers 
-        self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head) for _ in range(n_layer)])
-
-        self.ln_f = nn.LayerNorm(n_embd) #final layer norm
-        # transforming the decoders output into something that softmax can work with 
-        self.lm_head = nn.Linear(n_embd, vocab_size) #language modeling head
-
-        self.apply(self._init_weights)
-
-    # this shit just helps with stable learning of the model i wont go deeper cause it is fkin confusing 
-    def _init_weights(self, module):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-        
-    def forward(self, index, targets=None):
-        B, T = index.shape
-        #idx and targets are bith (B,T) tensor of intigers
-        tok_emb = self.token_embedding_table(index) # (B,T,C)
-        # how long is T, it creates T number in indecies and give each a different n_embd vector (a little lookup table)
-        pos_emb = self.position_embedding_table(torch.arange(T, device=device)) # (T,C)
-        x = tok_emb + pos_emb # (B,T,C)
-        x = self.blocks(x) # (B,T,C)
-        x = self.ln_f(x) # (B,T,C)
-        logits = self.lm_head(x) # (B,C,vocab_size)
-        
-        if targets is None:
-            # If we're just using the model (not training), no need for a loss.
-            loss = None
-        else:
-            # We're training the model, so calculate how wrong the guesses were.
-            # First, flatten the logits and targets to make them easier to compare.
-            B, T, C = logits.shape 
-            logits = logits.view(B*T, C)         # make logits 2D: (all tokens, vocab_size)
-            targets = targets.view(B*T)          # flatten targets too: (all tokens)
-            # Now calculate how far off the model’s guesses were.
-            loss = F.cross_entropy(logits, targets)
-
-        # Return both the guesses and the loss (loss is None during generation)
-        return logits, loss
 
 class AsunaLanguageModel(nn.Module):
     def __init__(self, vocab_size):
@@ -360,17 +319,21 @@ class AsunaLanguageModel(nn.Module):
                     )
 
                 index = torch.cat((index, index_next), dim=1)
-
+                if index_next.item() == tokenizer.eos_token_id:
+                    break
         return index
 
 
-model = AsunaLanguageModel(vocab_size) # make the model and tell it how many tokens it can know
-print('Loading model parameters...')
-with open('C:/Documents/model-01-expanded-512.pkl', 'rb') as f:
-   model = pickle.load(f)
+model = AsunaLanguageModel(vocab_size)
+model.token_embedding_table = nn.Embedding(vocab_size, n_embd).to(device)
+model.lm_head = nn.Linear(n_embd, vocab_size).to(device)
+model = model.to(device) # put the model on GPU if available otherwise CPU
+
+# load the weights
+model.load_state_dict(torch.load("C:/Documents/asuna.pt", map_location=device))
+#model.load_state_dict(torch.load("asuna.pt", map_location=device))
 
 print("Model initialized")
-m = model.to(device) # put the model on GPU if available otherwise CPU
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate) # creates AdamW optimizer instance to update the models parameters
 print("Starting training...")
@@ -405,8 +368,11 @@ try:
 except KeyboardInterrupt:
     print('Training interrupted!')
 
+tokenizer.save_pretrained("tokenizer/")
 # save the model 
-with open('C:/Documents/model-01-expanded-512.pkl', 'wb') as f:
-    pickle.dump(model, f)
+torch.save(model.state_dict(), "C:/Documents/asuna.pt")
 print('Model saved')
 print(f'New total iterations: {total}')
+with open(loss_logs, 'a') as f:
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    f.write(f"[{timestamp}] Training sequence completed\n")

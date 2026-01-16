@@ -1,0 +1,18 @@
+{
+  "bos_token": {
+    "content": "<|endoftext|>",
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  },
+  "eos_token": "\u0000",
+  "pad_token": "\u0000",
+  "unk_token": {
+    "content": "<|endoftext|>",
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  }
+}

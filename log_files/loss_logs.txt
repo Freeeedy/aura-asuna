@@ -471,3 +471,105 @@
 
 [2026-01-13 22:58:39] step: 0, train loss: 1.480, val loss: 1.478
 [2026-01-13 23:03:28] step: 1000, train loss: 0.501, val loss: 1.144
+[2026-01-14 18:33:20] step: 0, train loss: 11.006, val loss: 11.007
+[2026-01-14 18:36:06] step: 100, train loss: 7.223, val loss: 7.207
+[2026-01-14 18:41:28] step: 200, train loss: 6.864, val loss: 6.882
+[2026-01-14 18:48:32] step: 300, train loss: 6.607, val loss: 6.725
+[2026-01-14 18:53:23] step: 400, train loss: 6.563, val loss: 6.547
+
+[2026-01-14 19:14:55] step: 0, train loss: 6.413, val loss: 6.407
+[2026-01-14 19:45:16] step: 1000, train loss: 5.960, val loss: 5.966
+
+[2026-01-14 20:50:19] step: 0, train loss: 5.972, val loss: 5.885
+[2026-01-14 20:50:43] step: 10, train loss: 5.973, val loss: 5.639
+
+[2026-01-14 20:57:03] step: 0, train loss: 11.029, val loss: 11.007
+[2026-01-14 20:57:25] step: 10, train loss: 9.311, val loss: 9.395
+
+[2026-01-14 21:01:25] step: 0, train loss: 10.961, val loss: 10.964
+[2026-01-14 21:31:19] step: 1000, train loss: 6.109, val loss: 6.131
+[2026-01-14 22:00:57] step: 2000, train loss: 5.744, val loss: 5.746
+[2026-01-14 22:30:34] step: 3000, train loss: 5.507, val loss: 5.456
+[2026-01-14 23:00:10] step: 4000, train loss: 5.233, val loss: 5.256
+[2026-01-14 23:29:47] step: 5000, train loss: 4.989, val loss: 5.032
+[2026-01-14 23:59:24] step: 6000, train loss: 4.877, val loss: 4.913
+[2026-01-15 00:29:00] step: 7000, train loss: 4.718, val loss: 4.697
+[2026-01-15 00:58:36] step: 8000, train loss: 4.637, val loss: 4.619
+[2026-01-15 01:28:13] step: 9000, train loss: 4.533, val loss: 4.515
+
+[2026-01-15 06:53:19] step: 0, train loss: 11.010, val loss: 11.014
+[2026-01-15 07:24:00] step: 1000, train loss: 6.098, val loss: 6.134
+[2026-01-15 07:54:42] step: 2000, train loss: 5.743, val loss: 5.735
+
+[2026-01-15 15:00:31] step: 0, train loss: 4.560, val loss: 4.778
+[2026-01-15 15:00:52] step: 10, train loss: 4.416, val loss: 4.467
+
+[2026-01-15 15:07:06] step: 0, train loss: 4.532, val loss: 4.509
+[2026-01-15 15:49:31] step: 1000, train loss: 4.550, val loss: 4.540
+[2026-01-15 16:23:56] step: 2000, train loss: 4.425, val loss: 4.440
+[2026-01-15 16:56:56] step: 3000, train loss: 4.288, val loss: 4.317
+[2026-01-15 17:29:56] step: 4000, train loss: 4.269, val loss: 4.303
+[2026-01-15 18:02:54] step: 5000, train loss: 4.230, val loss: 4.246
+[2026-01-15 18:35:54] step: 6000, train loss: 4.136, val loss: 4.153
+[2026-01-15 19:08:53] step: 7000, train loss: 4.099, val loss: 4.098
+[2026-01-15 19:41:53] step: 8000, train loss: 4.072, val loss: 4.056
+[2026-01-15 20:14:55] step: 9000, train loss: 3.991, val loss: 4.014
+
+[2026-01-15 21:30:04] step: 0, train loss: 4.003, val loss: 4.009
+[2026-01-15 22:15:58] step: 1000, train loss: 4.068, val loss: 4.057
+
+[2026-01-15 23:01:36] step: 0, train loss: 4.043, val loss: 4.179
+[2026-01-15 23:05:00] step: 100, train loss: 4.111, val loss: 4.142
+[2026-01-15 23:08:27] step: 200, train loss: 4.140, val loss: 4.146
+[2026-01-15 23:11:53] step: 300, train loss: 4.088, val loss: 4.101
+[2026-01-15 23:15:18] step: 400, train loss: 3.921, val loss: 4.195
+
+[2026-01-15 23:22:23] step: 0, train loss: 4.107, val loss: 4.094
+[2026-01-15 23:26:52] step: 100, train loss: 4.209, val loss: 4.175
+[2026-01-15 23:31:30] step: 200, train loss: 4.239, val loss: 4.150
+[2026-01-15 23:35:47] step: 300, train loss: 4.156, val loss: 4.205
+[2026-01-15 23:40:14] step: 400, train loss: 4.188, val loss: 4.177
+
+[2026-01-15 23:59:27] step: 0, train loss: 4.672, val loss: 4.637
+
+[2026-01-16 00:03:48] step: 0, train loss: 4.625, val loss: 4.597
+[2026-01-16 00:17:43] step: 0, train loss: 4.328, val loss: 4.239
+[2026-01-16 00:18:00] step: 10, train loss: 4.449, val loss: 4.286
+
+[2026-01-16 00:18:59] step: 0, train loss: 4.475, val loss: 4.534
+[2026-01-16 00:19:19] step: 10, train loss: 4.142, val loss: 4.324
+
+[2026-01-16 00:20:42] step: 0, train loss: 4.310, val loss: 4.263
+[2026-01-16 00:21:00] step: 10, train loss: 4.504, val loss: 4.428
+
+[2026-01-16 00:24:17] step: 0, train loss: 4.432, val loss: 4.307
+[2026-01-16 00:24:36] step: 10, train loss: 4.400, val loss: 4.553
+[2026-01-16 00:24:54] Training sequence completed
+
+[2026-01-16 00:32:50] step: 0, train loss: 4.377, val loss: 4.379
+[2026-01-16 01:12:08] step: 1000, train loss: 4.144, val loss: 4.168
+[2026-01-16 01:48:44] step: 2000, train loss: 3.940, val loss: 4.012
+[2026-01-16 02:25:19] step: 3000, train loss: 3.867, val loss: 3.916
+[2026-01-16 03:01:55] step: 4000, train loss: 3.741, val loss: 3.850
+[2026-01-16 03:38:27] step: 5000, train loss: 3.649, val loss: 3.749
+[2026-01-16 04:15:00] step: 6000, train loss: 3.644, val loss: 3.717
+[2026-01-16 04:51:35] step: 7000, train loss: 3.547, val loss: 3.652
+[2026-01-16 05:28:09] step: 8000, train loss: 3.492, val loss: 3.640
+[2026-01-16 06:04:44] step: 9000, train loss: 3.411, val loss: 3.605
+[2026-01-16 06:38:16] Training sequence completed
+
+[2026-01-16 06:58:17] step: 0, train loss: 3.387, val loss: 3.549
+[2026-01-16 07:23:30] step: 1000, train loss: 3.417, val loss: 3.616
+[2026-01-16 07:48:42] step: 2000, train loss: 3.375, val loss: 3.577
+[2026-01-16 08:13:57] step: 3000, train loss: 3.339, val loss: 3.526
+[2026-01-16 08:39:09] step: 4000, train loss: 3.286, val loss: 3.514
+[2026-01-16 09:04:22] step: 5000, train loss: 3.256, val loss: 3.485
+[2026-01-16 09:29:34] step: 6000, train loss: 3.202, val loss: 3.471
+[2026-01-16 09:54:47] step: 7000, train loss: 3.201, val loss: 3.478
+[2026-01-16 10:20:00] step: 8000, train loss: 3.149, val loss: 3.409
+[2026-01-16 10:45:12] step: 9000, train loss: 3.146, val loss: 3.416
+[2026-01-16 11:10:24] step: 10000, train loss: 3.104, val loss: 3.413
+[2026-01-16 11:35:37] step: 11000, train loss: 3.095, val loss: 3.344
+[2026-01-16 12:00:48] step: 12000, train loss: 3.052, val loss: 3.385
+[2026-01-16 12:26:00] step: 13000, train loss: 3.034, val loss: 3.357
+[2026-01-16 12:48:13] Training sequence completed

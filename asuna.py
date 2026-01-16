@@ -1,47 +1,24 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-import mmap
-import random
-import pickle
-import argparse
 import datetime
 import os
 import unicodedata
+from transformers import GPT2Tokenizer
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu' # use cuda(gpu) if not available use cpu
 print (device)
 
-block_size = 128 # how many blocks can the model see at once
+block_size = 512 # how many blocks can the model see at once
 n_embd = 384 # creates a 384 attribute embedding_vector
 n_layer = 12
 n_head = 12
-dropout = 0.25 # 20% neurons will be turned off to prevent overfitting 
+dropout = 0.2 # 20% neurons will be turned off to prevent overfitting 
 
-chat_logs = "log_files/chat_logs.txt"
+tokenizer = GPT2Tokenizer.from_pretrained("tokenizer/") # load trained tokenizer from training
+vocab_size = len(tokenizer) # len vocab size from the tokenizer lib
+print("Tokenizer loaded")
 
-chars = ""
-with open ('vocab.txt', 'r', encoding='utf-8') as f: # use text and encode it with utf-8
-        text = f.read() # let the script read the text
-        chars = sorted(list(set(text))) # sort all used characters in text
-    
-vocab_size = len(chars) # sets the vocab_size to the number of characters in chars
-
-string_to_int = { ch:i for i,ch in enumerate(chars) } # make string of characters into intigers (full numbers)
-int_to_string = { i:ch for i,ch in enumerate(chars) } # make intigers into string of characters
-unk_id = string_to_int.get('<unk>', 0) # unknown character id
-encode = lambda s: [string_to_int.get(c, unk_id) for c in s] # encode the characters into intigers
-decode = lambda l: ''.join([int_to_string[i] for i in l]) # decode the intigers into characters
-
-SPECIAL_CHARS = {'\x00', '\x01', '\x02'}
-
-def normalize_text(s: str) -> str:
-    s = s.replace("\xa0", " ")
-    s = ''.join(
-        ch for ch in s
-        if (unicodedata.category(ch)[0] != 'C') or (ch in SPECIAL_CHARS)
-    )
-    return s
 
 class Head(nn.Module):
     """ one head of self-attention """
@@ -52,7 +29,6 @@ class Head(nn.Module):
         self.query = nn.Linear(n_embd, head_size, bias=False)
         self.value = nn.Linear(n_embd, head_size, bias=False)
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size))) # registers the no looking ahead rule and the buffer saves computation because it doesnt need to be initialized every time ig
-
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -182,13 +158,10 @@ class AsunaLanguageModel(nn.Module):
 
                 vocab_size = self.token_embedding_table.num_embeddings
                 if idx_cond.min().item() < 0 or idx_cond.max().item() >= vocab_size:
-                    raise IndexError(
-                        f"Pre-forward: index out of range: "
-                        f"min={int(idx_cond.min())}, max={int(idx_cond.max())}, vocab={vocab_size}"
-                    )
+                    raise IndexError(f"Pre-forward: index out of range")
 
                 logits, _ = self.forward(idx_cond)
-                logits = logits[:, -1, :]  # (B, vocab)
+                logits = logits[:, -1, :]  # (B, vocab_size)
 
                 # repetition penalty
                 window = 128  # or block_size
@@ -202,8 +175,6 @@ class AsunaLanguageModel(nn.Module):
                             else:
                                 logits[b, token_id] *= repetition_penalty
 
-
-                # -------- sampling --------
                 logits = logits / max(temperature, 1e-8)
 
                 # top-k
@@ -212,7 +183,7 @@ class AsunaLanguageModel(nn.Module):
                     min_values = values[:, -1].unsqueeze(1)
                     logits = torch.where(logits < min_values, float('-inf'), logits)
 
-                # top-p (nucleus)
+                # top-p
                 if top_p is not None:
                     sorted_logits, sorted_indices = torch.sort(logits, descending=True)
                     probs = F.softmax(sorted_logits, dim=-1)
@@ -229,7 +200,6 @@ class AsunaLanguageModel(nn.Module):
 
                 probs = F.softmax(logits, dim=-1)
                 index_next = torch.multinomial(probs, num_samples=1)
-                # --------------------------
 
                 if index_next.max().item() >= vocab_size or index_next.min().item() < 0:
                     raise IndexError(
@@ -238,18 +208,36 @@ class AsunaLanguageModel(nn.Module):
 
                 index = torch.cat((index, index_next), dim=1)
 
+                if index_next.item() == tokenizer.eos_token_id:
+                    break
+            
         return index
 
 
 print('Loading model parameters...')
-with open('C:/Documents/model-01-expanded-512.pkl', 'rb') as f:
-    model = pickle.load(f)
-print("Model initialized")
-m = model.to(device).eval() # put the model on GPU if available otherwise CPU
+model = AsunaLanguageModel(vocab_size)
+model.load_state_dict(torch.load("C:/Documents/asuna.pt"))
+model = model.to(device)
+model.eval()
+print("Model loaded")
 
-EOS = '\x00'
-USER = '\x01'
-ASSISTANT = '\x02'
+# Special control tokens
+USER_TOKEN = '\x01'
+ASSISTANT_TOKEN = '\x02'
+
+# Text normalization
+def normalize_text(s: str) -> str:
+    s = s.replace("\xa0", " ") # replace unknown characters with ''
+    s = ''.join(
+        ch for ch in s
+        if (unicodedata.category(ch)[0] != 'C') or (ch in {USER_TOKEN, ASSISTANT_TOKEN, '\x00'})
+    )
+    return s
+
+chat_logs = "log_files/chat_logs.txt"
+os.makedirs(os.path.dirname(chat_logs), exist_ok=True)
+
+print("Chat interface ready. Type 'exit' or 'quit' to stop.\n")
 
 while True:
     prompt = input("Prompt:\n")
@@ -257,10 +245,14 @@ while True:
     if prompt.strip().lower() in ('exit', 'quit'):
         break
 
-    structured_prompt = f"{USER}{prompt}{ASSISTANT}"
-    context = torch.tensor(encode(structured_prompt), dtype=torch.long, device=device)
-    output_ids = m.generate(
-        context.unsqueeze(0),
+    prompt = normalize_text(prompt)
+    structured_prompt = f"{USER_TOKEN}{prompt}{ASSISTANT_TOKEN}"
+
+    context_ids = tokenizer.encode(structured_prompt, add_special_tokens=False)
+    context = torch.tensor(context_ids, dtype=torch.long, device=device).unsqueeze(0)
+    
+    output_ids = model.generate(
+        context,
         max_new_tokens=2500,
         temperature=0.6,
         top_k=50,
@@ -268,17 +260,18 @@ while True:
         repetition_penalty=1.1
     )[0].tolist()
 
-    decoded = decode(output_ids)
+    # Extract only the generated response tokens (everything after the prompt)
+    response_ids = output_ids[len(context_ids):]
 
-    # keep only assistant output
-    if ASSISTANT in decoded:
-        decoded = decoded.split(ASSISTANT, 1)[1]
+    # Remove trailing EOS token if the model generated it
+    eos_id = tokenizer.eos_token_id
+    if response_ids and response_ids[-1] == eos_id:
+        response_ids = response_ids[:-1]
 
-    # stop at EOS
-    if EOS in decoded:
-        decoded = decoded.split(EOS, 1)[0]
-
+    # Decode only the response, skipping any special tokens and cleaning up BPE artifacts
+    decoded = tokenizer.decode(response_ids, skip_special_tokens=True)
     
+    # logging
     with open(chat_logs, 'a', encoding='utf-8', errors='replace') as f:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         f.write(f"[{timestamp}] Prompt: {prompt}\n[{timestamp}] Output: {decoded}\n")
